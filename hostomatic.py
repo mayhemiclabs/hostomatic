@@ -5,7 +5,7 @@
 #
 # USAGE: ./hostomatic.py [-h] [-i INPUTFILE | -a ADDRESS] [-o OUTPUTFILE]
 #
-# All code Copyright (c) 2012, Ben Jackson and Mayhemic Labs -
+# All code Copyright (c) 2012-2019, Ben Jackson and Mayhemic Labs -
 # bbj@mayhemiclabs.com. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
