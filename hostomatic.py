@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # hostomatic.py - Script that takes in IP or FQDNs and and prints 
 # out information regarding their location on the Internet
@@ -30,14 +30,14 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import sys, time, dns, ipaddr, socket, pygeoip, argparse, Queue, threading
+import sys, time, dns, ipaddr, socket, pygeoip, argparse, queue, threading
 from dns import resolver,reversename
 
 private_nets = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '169.254.0.0/16']
 num_workers = 5
 
-host_list = Queue.Queue()
-ip_resolved_list = Queue.Queue()
+host_list = queue.Queue()
+ip_resolved_list = queue.Queue()
 
 def dns_query(query_type,value):
     resolver = dns.resolver.Resolver()
@@ -47,11 +47,11 @@ def dns_query(query_type,value):
     try:
          value = resolver.query(value,query_type)
 
-    except dns.exception.Timeout, e:
+    except dns.exception.Timeout:
         value = 'TIMEOUT'
-    except dns.resolver.NXDOMAIN, e:
+    except dns.resolver.NXDOMAIN:
         value = 'NXDOMAIN'
-    except dns.resolver.NoAnswer, e:
+    except dns.resolver.NoAnswer:
         value = 'NOANSWER'
     except:
         value = 'ERROR'
@@ -62,68 +62,68 @@ def rdns_query(ip):
 
         try:
                 ipaddr.IPAddress(ip)
-        except ValueError, e:
+        except ValueError:
                 return 'INVALID'
 
-	result = dns_query("PTR",reversename.from_address(ip))
+        result = dns_query("PTR",reversename.from_address(ip))
 
-	if(type(result) is str):
-		value = result
-	else:
-               	value = str(result[0]).rstrip('.')
+        if(type(result) is str):
+                value = result
+        else:
+                value = str(result[0]).rstrip('.')
 
         return value
 
 def reverse_ip(ip):
-	ip_array = ip.split('.')
-	ip_rev = ip_array[3] + '.' + ip_array[2] + '.' + ip_array[1] + '.' + ip_array[0]
-	return ip_rev
+        ip_array = ip.split('.')
+        ip_rev = ip_array[3] + '.' + ip_array[2] + '.' + ip_array[1] + '.' + ip_array[0]
+        return ip_rev
 
 def network_lookup(ip):
 
-	if not is_rfc1918_address(ip):
-		ip_rev = reverse_ip(ip)
-		result = dns_query("TXT",ip_rev + '.origin.asn.shadowserver.org')
-	else:
-		result = 'PRIVATE NETWORK'
-	
-	values = {}	
+        if not is_rfc1918_address(ip):
+                ip_rev = reverse_ip(ip)
+                result = dns_query("TXT",ip_rev + '.origin.asn.shadowserver.org')
+        else:
+                result = 'PRIVATE NETWORK'
+        
+        values = {}        
 
-	if(type(result) is str):
-	        values['as_number'] = result
-	        values['as_name'] = result
-	        values['as_netblock'] = result
-	        values['as_country'] = result
-	        values['as_domain'] = result
-	        values['as_isp'] = result
-	else:
+        if(type(result) is str):
+                values['as_number'] = result
+                values['as_name'] = result
+                values['as_netblock'] = result
+                values['as_country'] = result
+                values['as_domain'] = result
+                values['as_isp'] = result
+        else:
                 as_response = str(result[0]).replace('"','')
                 as_values = as_response.split('|')
 
-	        values['as_number'] = as_values[0].strip()
-	        values['as_netblock'] = as_values[1].strip()
-	        values['as_name'] = as_values[2].strip()
-	        values['as_country'] = as_values[3].strip()
-	        values['as_domain'] = as_values[4].strip()
-	        values['as_isp'] = as_values[5].strip()
+                values['as_number'] = as_values[0].strip()
+                values['as_netblock'] = as_values[1].strip()
+                values['as_name'] = as_values[2].strip()
+                values['as_country'] = as_values[3].strip()
+                values['as_isp'] = as_values[4].strip()
+                values['as_domain'] = '' #as_values[5].strip()
 
         return values
 
 
 def abuse_lookup(ip):
 
-	if not is_rfc1918_address(ip):
-		ip_rev = reverse_ip(ip)
-		result = dns_query("TXT",ip_rev + '.abuse-contacts.abusix.org')
-	else:
-		result = 'PRIVATE NETWORK'
+        if not is_rfc1918_address(ip):
+                ip_rev = reverse_ip(ip)
+                result = dns_query("TXT",ip_rev + '.abuse-contacts.abusix.org')
+        else:
+                result = 'PRIVATE NETWORK'
 
-	values = {}
+        values = {}
 
-	if(type(result) is str):
-	        values['abuse_contact'] = result
-	else:
-		values['abuse_contact'] = str(result[0]).replace('"','')
+        if(type(result) is str):
+                values['abuse_contact'] = result
+        else:
+                values['abuse_contact'] = str(result[0]).replace('"','')
 
         return values
 
@@ -154,15 +154,15 @@ def resolvomatic():
 
         host = str(host_list.get()).split('|')
 
-	address_info = {}
+        address_info = {}
         address_info['fqdn'] = host[0]
-	address_info['ip'] = host[1]
-	address_info['reverse_dns'] = rdns_query(address_info['ip'])
+        address_info['ip'] = host[1]
+        address_info['reverse_dns'] = rdns_query(address_info['ip'])
 
-	address_info.update(network_lookup(address_info['ip']))
-	address_info.update(abuse_lookup(address_info['ip']))
+        address_info.update(network_lookup(address_info['ip']))
+        address_info.update(abuse_lookup(address_info['ip']))
 
-	if args.geocode:
+        if args.geocode:
             address_info.update(gi.record_by_addr(host[1]))
         else:
             address_info['latitude'] = 0
@@ -171,7 +171,7 @@ def resolvomatic():
         ip_resolved_list.put(address_info)
 
         host_list.task_done()
-	time.sleep(.5)
+        time.sleep(.5)
 
 def writeomatic():
     output.write("FQDN|IP_Address|Reverse_DNS|Abuse_Contact|AS_Number|AS_Netblock|AS_Name|AS_Country|AS_Domain|AS_ISP|Lat|Long" + "\n")
@@ -184,8 +184,8 @@ def writeomatic():
               str(ip_resolved_addr['as_country']) + "|" + str(ip_resolved_addr['as_domain']) + "|" +  
               str(ip_resolved_addr['as_isp']) + "|" + str(ip_resolved_addr['latitude']) + "|" + 
               str(ip_resolved_addr['longitude']) + "\n")
-	    ip_resolved_list.task_done()
-        except Queue.Empty:
+            ip_resolved_list.task_done()
+        except queue.Empty:
             if host_list.qsize() > 0:
                 time.sleep(1)
             else:
@@ -221,24 +221,24 @@ if(args.inputfile):
         if (is_ip_address(line)):
             host_list.put("N/A" + "|" + line)
         else:
-	        result = dns_query("A",line)
+                result = dns_query("A",line)
 
-		if(type(result) is str):
-		        host_list.put(line + "|0.0.0.0")
-		else:
-			for address in result:
-				host_list.put(line + "|" + str(address))
+                if(type(result) is str):
+                        host_list.put(line + "|0.0.0.0")
+                else:
+                        for address in result:
+                                host_list.put(line + "|" + str(address))
 else:
     if is_ip_address(args.address):
         host_list.put("N/A" + "|" + args.address)
     else:
         result = dns_query("A",args.address)
 
-	if(type(result) is str):
-	        host_list.put(args.address + "|0.0.0.0")
-	else:
-		for address in result:
-			host_list.put(args.address + "|" + str(address))
+        if(type(result) is str):
+                host_list.put(args.address + "|0.0.0.0")
+        else:
+                for address in result:
+                        host_list.put(args.address + "|" + str(address))
 
 for workers in range(num_workers):
     thread = threading.Thread(target=resolvomatic)
